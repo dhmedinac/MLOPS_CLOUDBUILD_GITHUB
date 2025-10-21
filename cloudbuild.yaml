@@ -1,30 +1,47 @@
 steps:
+# 1. Build the Docker Image
+# Removed the explicit 'push' step from the original config and updated the tag to AR format.
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/firstprojectdavidmedina/demo-flask-app:$COMMIT_SHA', '.']
-
+  id: 'build-image'
+  args: 
+    - 'build'
+    - '-t'
+    - 'us-central1-docker.pkg.dev/swift-castle-475318-g6/python-apps/demo-flask-app:$COMMIT_SHA'
+    - '.'
+# Added by David  us-central1-docker.pkg.dev/swift-castle-475318-g6/python-apps
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/firstprojectdavidmedina/demo-flask-app:$COMMIT_SHA']
-
-- name: 'gcr.io/firstprojectdavidmedina/demo-flask-app:$COMMIT_SHA'
+  id: 'push-image'
+  args: 
+    - 'push'
+    - 'us-central1-docker.pkg.dev/swift-castle-475318-g6/python-apps/demo-flask-app:$COMMIT_SHA'
+# 2. Run Tests (Uses the newly built AR-tagged image as the builder)
+- name: 'us-central1-docker.pkg.dev/swift-castle-475318-g6/python-apps/demo-flask-app:$COMMIT_SHA' 
+  id: 'run-tests'
   entrypoint: 'bash'
   args:
-   - '-c'
-   - |
+    - '-c'
+    - |
       python -m pytest
-  
+      
+# 3. Deploy to Cloud Run (Updated --image flag to the AR path)
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'deploy-cloud-run'
   entrypoint: gcloud
   args:
-   - 'run'
-   - 'deploy'
-   - 'py-bq-load'
-   - '--image'
-   - 'gcr.io/firstprojectdavidmedina/demo-flask-app:$COMMIT_SHA'
-   - '--region'
-   - 'us-central1'
-   - '--allow-unauthenticated'
-images:
-- 'gcr.io/firstprojectdavidmedina/demo-flask-app:$COMMIT_SHA'
+    - 'run'
+    - 'deploy'
+    - 'py-bq-load'
+    - '--image'
+    - 'us-central1-docker.pkg.dev/swift-castle-475318-g6/python-apps/demo-flask-app:$COMMIT_SHA'
+    - '--region'
+    - 'us-central1'
+    - '--allow-unauthenticated'
+    - '--platform'
+    - 'managed' # Added best practice platform flag
+
+# --- The 'images' list tells Cloud Build which images to push (replaces the 'docker push' step) ---
+#images:
+#- 'us-central1-docker.pkg.dev/swift-castle-475318-g6/python-apps/demo-flask-app:$BUILD_ID'
 
 options:
   logging: CLOUD_LOGGING_ONLY
